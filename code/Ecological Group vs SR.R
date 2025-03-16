@@ -1,5 +1,5 @@
 
-###### ECOLOGICAL GROUPS #####
+####### ECOLOGICAL GROUPS #####
 ### Endemic, generalist, exotic species cover & richness
 #### Q: how does the cover of endemic, generalist and exotic species change with SR?
 

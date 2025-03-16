@@ -1,4 +1,4 @@
-##### DIVERSITY GLMM ######
+##### DIVERSITY GLMM #######
 library(performance)
 library(see)
 library(adespatial)
