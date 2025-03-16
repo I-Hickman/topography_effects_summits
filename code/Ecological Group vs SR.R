@@ -829,7 +829,7 @@ ggsave("output/Endemic, gen & exotics/Composition/EGE abundance vs solar radiati
 
 
 #Richness
-pdf("output/Appendix/Richness model predictions.pdf", width = 5, height = 3.5)
+pdf("output/Richness model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mRich))
 plot(preds$Estimate ~ mRich$data$species.richness,  
      xlab = "Richness observations",
@@ -838,7 +838,7 @@ abline(0, 1, col= 'red')
 dev.off() 
 
 #PA
-pdf("output/Appendix/EG PA model predictions.pdf", width = 5, height = 3.5)
+pdf("output/EG PA model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(EG_model))
 plot(preds$Estimate ~ EG_model$data$qCover,  
      xlab = "PA observations",
@@ -848,7 +848,7 @@ dev.off()
 
 
 #Cover
-pdf("output/Appendix/EG Cover model predictions.pdf", width = 5, height = 3.5)
+pdf("output/EG Cover model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(EG_cov_model))
 plot(preds$Estimate ~ EG_cov_model$data$qCover,  
      xlab = "Cover observations",
