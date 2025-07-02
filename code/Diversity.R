@@ -28,8 +28,8 @@ library(tibble)
 # CONTENTS
 # 1. Load data and scale and center variables
 # 2. Richness vs solar radiation
-# 3. Diversity Hill 1 vs solar radiation
-# 4. Diversity Hill 2 vs Solar radiation
+# 3. Diversity hill 1 vs solar radiation
+# 4. Diversity hill 2 vs Solar radiation
 # 5. Save all graphs
 ###
 ##
@@ -39,8 +39,14 @@ library(tibble)
 ### 1) LOAD DATA AND SCALE VARIABLES #####
 
 div_df <- read.csv("data/Diversity dataset.csv")
+solar_rad <- read.csv("data/Cumulative SR for site per aspect (floristics).csv")
+div_df <- div_df %>%
+  left_join(solar_rad, by = c("Site", "Aspect")) %>% #join solar radiation data
+  dplyr::select(Code, Site, avg.SR, species_richness, hill_1, hill_2) #select relevant columns
+
 glimpse(div_df) 
 
+#Scale and center the solar radiation variable
 div_df$SR.std = as.vector(scale(div_df$avg.SR)) #scales and centers variables
 
 
@@ -110,9 +116,6 @@ Rich_rand <- ggplot(mRich_rand2, aes(x = Site.Estimate.Intercept, y = reorder(Va
         axis.title.x = element_text(size = 12)) +
   xlab("Coefficients")
 
-ggsave("output/Diversity indices/Bayesian/D0/D0 (random).png", 
-       plot = Rich_rand, width = 5, height = 3.5) 
-
 
 
 #### Step 4) Plot predictions
@@ -159,25 +162,25 @@ D0_plot <- D0_plot+
 #PLot all togeher
 plot_D0 <- grid.arrange(Rich_fixed_plot, D0_plot, ncol = 2)
 
-ggsave("output/Diversity indices/Bayesian/D0/D0 vs solar radiation.png", 
+ggsave("output/D0 vs solar radiation.png", 
        plot = plot_D0, width = 10, height = 3.5)
 
 
 
 
-######## 3) HILL 1 #########
-#look at relationship between solar radiation and Hill1 using ggplot
-ggplot(div_df, aes(x = avg.SR, y = Hill1)) + 
+######## 3) hill 1 #########
+#look at relationship between solar radiation and hill_1 using ggplot
+ggplot(div_df, aes(x = avg.SR, y = hill_1)) + 
   geom_smooth(method = "lm") +
   geom_point() +
   theme_cowplot() +
-  ylab(expression("Hill" ^ "1"))+
+  ylab(expression("hill" ^ "1"))+
   xlab(expression("Solar radiation W/m" ^ "2")) +
   theme(axis.title.y = element_text(size = 12), 
         axis.title.x = element_text(size = 12))
 
 #### Step 1) Build ecologically sound model
-mD1 <- brms::brm(Hill1 ~ SR.std + (1 | Site), 
+mD1 <- brms::brm(hill_1 ~ SR.std + (1 | Site), 
                       family = Gamma(link = "log"),
                       iter = 4000,
                       cores = 4,
@@ -232,17 +235,14 @@ D1_rand <- ggplot(D1_rand2, aes(x = Site.Estimate.Intercept, y = reorder(Variabl
         axis.title.x = element_text(size = 12)) +
   xlab("Coefficients")
 
-ggsave("output/Diversity indices/Bayesian/D1/D1 (random).png", 
-       plot = D1_rand, width = 5, height = 3.5) 
-
 
 #### Step 3) Plot predictions from model
 #new dataframe
-new_hill1 <- data.frame(Site = "average site",
+new_hill_1 <- data.frame(Site = "average site",
                         avg.SR = seq(393520, 486080, by = 1000)) %>% 
   dplyr::mutate(SR.std = (avg.SR - 462020.3)/20615.8)
 #Predictions
-predictions<- posterior_epred(mD1, newdata = new_hill1,  
+predictions<- posterior_epred(mD1, newdata = new_hill_1,  
                               allow_new_levels = TRUE) 
 #Mean
 mean <- apply(predictions, 2, mean)
@@ -250,15 +250,15 @@ mean <- apply(predictions, 2, mean)
 lci <- apply(predictions, 2, quantile, 0.025)
 uci <- apply(predictions, 2, quantile, 0.975)
 #Combine 
-new_hill1$mean <- mean
-new_hill1$lci <- lci
-new_hill1$uci <- uci
+new_hill_1$mean <- mean
+new_hill_1$lci <- lci
+new_hill_1$uci <- uci
 
 ### Plot
-D1_plot <- ggplot(new_hill1, aes(x = avg.SR, y = mean)) + 
+D1_plot <- ggplot(new_hill_1, aes(x = avg.SR, y = mean)) + 
   geom_path() +
   geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2) +
-  geom_point(data = div_df, aes(x = avg.SR, y = Hill1), 
+  geom_point(data = div_df, aes(x = avg.SR, y = hill_1), 
              shape = 21, fill = "lightgrey", alpha = 0.2, colour = "black")+
   geom_line(size = 0.75) +
   theme_cowplot()+
@@ -276,17 +276,17 @@ D1_plot <- D1_plot+
 #PLot all togeher
 plot_D1 <- grid.arrange(D1_fixed_plot, D1_plot, ncol = 2)
 
-ggsave("output/Diversity indices/Bayesian/D1/D1 vs solar radiation.png", 
+ggsave("output/D1 vs solar radiation.png", 
        plot = plot_D1, width = 10, height = 3.5)
 
 
 
 
-########## 4) HILL 2 ###########
+########## 4) hill 2 ###########
 
 #### Step 1) Build ecologically sound model
 
-mD2 <- brms::brm(Hill2 ~ SR.std + (1 | Site),
+mD2 <- brms::brm(hill_2 ~ SR.std + (1 | Site),
                   family = Gamma(link = "log"),
                   iter = 4000,
                   cores = 4,
@@ -339,10 +339,6 @@ D2_rand <- ggplot(mD2_rand2, aes(x = Site.Estimate.Intercept, y = reorder(Variab
   xlab("Coefficients")
 
 
-ggsave("output/Diversity indices/Bayesian/D2/D2 (random).png", 
-       plot = D2_rand, width = 5, height = 3.5) 
-
-
 #### Step 4) Plot predictions
 
 mean(div_df$avg.SR) #462020.3
@@ -369,7 +365,7 @@ new_D2$uci <- uci
 D2_plot <- ggplot(new_D2, aes(x = avg.SR, y = mean)) + 
   geom_path() +
   geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2) +
-  geom_point(data = div_df, aes(x = avg.SR, y = Hill2), 
+  geom_point(data = div_df, aes(x = avg.SR, y = hill_2), 
              shape = 21, fill = "lightgrey", alpha = 0.2, colour = "black")+
   geom_line(size = 0.75) +
   theme_cowplot()+
@@ -387,20 +383,20 @@ D2_plot <- D2_plot+
 #PLot all togeher
 plot_D2 <- grid.arrange(D2_fixed, D2_plot, ncol = 2)
 
-ggsave("output/Diversity indices/Bayesian/D2/D2 vs solar radiation.png", 
+ggsave("output/D2 vs solar radiation.png", 
        plot = plot_D2, width = 10, height = 3.5)
 
 
 #####SAVE ALL ########
 plot_all <- grid.arrange(plot_D0, plot_D1, plot_D2, nrow = 3, ncol = 1)
 
-ggsave("output/Diversity indices/Bayesian/Diversity indices vs solar radiation.png", 
+ggsave("output/Diversity indices vs solar radiation.png", 
        plot = plot_all, width = 11, height = 12)
 
 
 ##### APPENDIX: Plot predictions vs observed for appendix #####
 #D0
-pdf("output/Appendix/mD0 model predictions.pdf", width = 5, height = 3.5)
+pdf("output/mD0 model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mD0))
 plot(preds$Estimate ~ mD0$data$species_richness,  
      xlab = "D0 observations",
@@ -409,17 +405,17 @@ abline(0, 1, col= 'red')
 dev.off() 
 
 #D1
-pdf("output/Appendix/mD1 model predictions.pdf", width = 5, height = 3.5)
+pdf("output/mD1 model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mD1))
-plot(preds$Estimate ~ mD1$data$Hill1,  
+plot(preds$Estimate ~ mD1$data$hill_1,  
      xlab = "D1 observations",
      ylab = "Model predictions")
 abline(0, 1, col= 'red')
 dev.off() 
 #D2
-pdf("output/Appendix/mD2 model predictions.pdf", width = 5, height = 3.5)
+pdf("output/mD2 model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mD2))
-plot(preds$Estimate ~ mD2$data$Hill2,  
+plot(preds$Estimate ~ mD2$data$hill_2,  
      xlab = "D2 observations",
      ylab = "Model predictions")
 abline(0, 1, col= 'red')
