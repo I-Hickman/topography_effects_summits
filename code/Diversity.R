@@ -162,10 +162,6 @@ D0_plot <- D0_plot+
 #PLot all togeher
 plot_D0 <- grid.arrange(Rich_fixed_plot, D0_plot, ncol = 2)
 
-ggsave("output/D0 vs solar radiation.png", 
-       plot = plot_D0, width = 10, height = 3.5)
-
-
 
 
 ######## 3) hill 1 #########
@@ -276,9 +272,6 @@ D1_plot <- D1_plot+
 #PLot all togeher
 plot_D1 <- grid.arrange(D1_fixed_plot, D1_plot, ncol = 2)
 
-ggsave("output/D1 vs solar radiation.png", 
-       plot = plot_D1, width = 10, height = 3.5)
-
 
 
 
@@ -383,20 +376,17 @@ D2_plot <- D2_plot+
 #PLot all togeher
 plot_D2 <- grid.arrange(D2_fixed, D2_plot, ncol = 2)
 
-ggsave("output/D2 vs solar radiation.png", 
-       plot = plot_D2, width = 10, height = 3.5)
-
 
 #####SAVE ALL ########
 plot_all <- grid.arrange(plot_D0, plot_D1, plot_D2, nrow = 3, ncol = 1)
 
-ggsave("output/Diversity indices vs solar radiation.png", 
+ggsave("figures/supplementary/Diversity indices vs solar radiation.png", 
        plot = plot_all, width = 11, height = 12)
 
 
 ##### APPENDIX: Plot predictions vs observed for appendix #####
 #D0
-pdf("output/mD0 model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/mD0 model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mD0))
 plot(preds$Estimate ~ mD0$data$species_richness,  
      xlab = "D0 observations",
@@ -405,7 +395,7 @@ abline(0, 1, col= 'red')
 dev.off() 
 
 #D1
-pdf("output/mD1 model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/mD1 model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mD1))
 plot(preds$Estimate ~ mD1$data$hill_1,  
      xlab = "D1 observations",
@@ -413,7 +403,7 @@ plot(preds$Estimate ~ mD1$data$hill_1,
 abline(0, 1, col= 'red')
 dev.off() 
 #D2
-pdf("output/mD2 model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/mD2 model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mD2))
 plot(preds$Estimate ~ mD2$data$hill_2,  
      xlab = "D2 observations",

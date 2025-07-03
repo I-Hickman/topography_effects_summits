@@ -17,7 +17,7 @@ library(future)
 
 ## Step 1) Load data ######
 
-Florisitc <- read.csv("data/2022 Summit florisitc.csv")
+Florisitc <- read.csv("data/2022 Summit floristic.csv")
 Traits <- read.csv("data/Trait dataset.csv")
 SR <- read.csv("data/Cumulative SR for site per aspect (floristics).csv")
 
@@ -84,7 +84,7 @@ sum(Flor_traits$Cover[Flor_traits$Species == "Hovea.montana"])/sum(Flor_traits$C
 
 
 
-############ 1) RICHNESS  ###########
+############ 1) Ecological Group model 1 (RICHNESS)  ###########
 
 ## Step 1. Calculate richness for each quadrat ######
 Flor_richness <-Flor_traits %>%
@@ -173,9 +173,6 @@ End_rand <- ggplot(mRich_rand2, aes(x = Site.Estimate.Intercept, y = reorder(Var
   theme(axis.title.y = element_blank(), 
         axis.title.x = element_text(size = 12)) +
   xlab("Coefficients")
-
-ggsave("output/Endemic, gen & exotics/Richness/EGE richness model (random effects).png", 
-       plot = End_rand, width = 10, height = 7.07) 
 
 
 ## Step 6) Plot predictions ####
@@ -271,13 +268,13 @@ EGE_plot <- EGE_plot+
 ## Step 7) Plot ####
 plot_end <- grid.arrange(End_fixed2, EGE_plot, ncol = 2)
 
-ggsave("output/Endemic, gen & exotics/Richness/EGE richness vs solar radiation.png", 
+ggsave("figures/manuscript/EGE richness vs solar radiation.png", 
        plot = plot_end, width = 10, height = 3.5)
 
 
 
 
-############## 2) PRESENCE & ABSENCES ############
+############## 2) Ecological Group model 2 (PRESENCE & ABSENCES) ############
 
 #Explore data
 hist(Flor_traits$Cover)
@@ -296,8 +293,9 @@ unique(EG_PA_data$PA)
 EG_PA_data$SR.std = as.vector(scale(EG_PA_data$SR)) 
 
 ## Step 2) Models ######
-options(mc.cores = parallel::detectCores())
-rstan_options(auto_write = TRUE, threads_per_chain = 1)
+#Run code below if models are running slow and unhash "future = true" in model
+#options(mc.cores = parallel::detectCores())
+#rstan_options(auto_write = TRUE, threads_per_chain = 1)
 
 #PA model
 EG_model <- brms::brm(PA ~ SR.std*Origin + (1 | Site) + (1|Species),
@@ -417,13 +415,6 @@ EG_rand_Sp <- ggplot(mEG_rand, aes(x = Species.Estimate.Intercept, y = reorder(V
   xlab("Estimated standard deviation")
 
 
-
-ggsave("output/Endemic, gen & exotics/Composition/EGE PA (Site random effects).png", 
-       plot = EG_rand_St,width = 10, height = 7.07) 
-ggsave("output/Endemic, gen & exotics/Composition/EGE PA (Species random effects).png", 
-       plot = EG_rand_Sp, width = 10, height = 7.07) 
-
-
 ## Step 6) Plot predictions #########
 
 mean(EG_PA_data$SR) #462020.3
@@ -541,7 +532,7 @@ plot_end <- grid.arrange(End_fixed,
                          Gen_cov_plot,
                          Exot_cov_plot, ncol = 2)
 
-ggsave("output/Endemic, gen & exotics/Composition/EGE PA vs solar radiation3.png", 
+ggsave("figures/manuscript/EGE PA vs solar radiation.png", 
        plot = plot_end, width = 11, height = 12)
 
 
@@ -549,7 +540,7 @@ ggsave("output/Endemic, gen & exotics/Composition/EGE PA vs solar radiation3.png
 
 
 
-############## 3) COVER ############
+############## 3) Ecological Group model 2 (COVER) ############
 
 #Explore data
 hist(Flor_traits$Cover)
@@ -575,15 +566,12 @@ unique(EG_cov_data$qCover)
 EG_cov_data$SR.std = as.vector(scale(EG_cov_data$SR)) 
 
 ## Step 2) Models ######
-options(mc.cores = parallel::detectCores())
-rstan_options(auto_write = TRUE, threads_per_chain = 1)
 
 #Cover model
 EG_cov_model <- brms::brm(qCover ~ SR.std*Origin + (1 | Site) + (1|Species),
                          family = gaussian(),
                          iter = 4000, #increase iterations if issues 
                          cores = 4,
-                         #future = TRUE,
                          chains = 4,
                          control = list(adapt_delta = 0.8, max_treedepth=16),
                          data = EG_cov_data)
@@ -693,13 +681,6 @@ EG_rand_Sp <- ggplot(mEG_rand, aes(x = Species.Estimate.Intercept, y = reorder(V
   theme(axis.title.y = element_blank(), 
         axis.title.x = element_text(size = 12)) +
   xlab("Estimated standard deviation")
-
-
-
-ggsave("output/Endemic, gen & exotics/Composition/EGE cover (Site random effects).png", 
-       plot = EG_rand_St,width = 10, height = 7.07) 
-ggsave("output/Endemic, gen & exotics/Composition/EGE cover (Species random effects).png", 
-       plot = EG_rand_Sp, width = 10, height = 7.07) 
 
 
 ## Step 6) Plot predictions #########
@@ -819,17 +800,16 @@ plot_end <- grid.arrange(End_fixed,
                          Gen_cov_plot,
                          Exot_cov_plot, ncol = 2)
 
-ggsave("output/Endemic, gen & exotics/Composition/EGE abundance vs solar radiation4.png", 
+ggsave("figures/manuscript/EGE cover vs solar radiation.png", 
        plot = plot_end, width = 11, height = 12)
 
 
 
 
-##### APPENDICES ######
-
-
+## 4) Supplementary material #####
+### Model predictions vs observed data for the supplementary material
 #Richness
-pdf("output/Richness model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/Richness model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mRich))
 plot(preds$Estimate ~ mRich$data$species.richness,  
      xlab = "Richness observations",
@@ -838,7 +818,7 @@ abline(0, 1, col= 'red')
 dev.off() 
 
 #PA
-pdf("output/EG PA model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/EG PA model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(EG_model))
 plot(preds$Estimate ~ EG_model$data$qCover,  
      xlab = "PA observations",
@@ -848,7 +828,7 @@ dev.off()
 
 
 #Cover
-pdf("output/EG Cover model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/EG Cover model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(EG_cov_model))
 plot(preds$Estimate ~ EG_cov_model$data$qCover,  
      xlab = "Cover observations",

@@ -95,7 +95,6 @@ mTraitsShrubs <- brms::brm(qCover ~
                     LDMC.std:SR.std + Height.std:SR.std + Seed_mass.std:SR.std + 
                       SLA.std:SR.std +
                     (1|Site) + (1|Species), 
-                    #could add (SR.std|)
                   family = gaussian,
                   iter = 4000,
                   cores = 4,
@@ -156,9 +155,6 @@ Shrub_rand <- ggplot(shrub_ran_DF, aes(x = estimate, y = variable)) +
         axis.title.x = element_text(size = 12)) +
   xlab("Estimated standard deviation")
 
-ggsave("output/Traits/Bayesian/Shrubs/Shrub traits (random effect).png", 
-       plot = Shrub_rand, width = 10, height = 7.07) 
-
 
 # 2. Site
 TrShrub_randSite <- as.data.frame(ranef(mTraitsShrubs, groups = "Site"))
@@ -176,8 +172,6 @@ Shrub_Site_rand <- ggplot(TrShrub_randSite2, aes(x = Site.Estimate.Intercept, y 
         axis.title.x = element_text(size = 12)) +
   xlab("Logit coefficients")
 
-ggsave("output/Traits/Bayesian/Shrubs/Shrub traits (Site random).png", 
-       plot = Shrub_Site_rand, width = 10, height = 7.07) 
 
 # 3. Species
 TrShrub_randSpp <- as.data.frame(ranef(mTraitsShrubs, groups = "Species"))
@@ -194,9 +188,6 @@ Shrub_Species_rand <- ggplot(TrShrub_randSpp2, aes(x = Species.Estimate.Intercep
   theme(axis.title.y = element_blank(), 
         axis.title.x = element_text(size = 12)) +
   xlab("Coefficients")
-
-ggsave("output/Traits/Bayesian/Shrubs/Shrub traits (Species random).png", 
-       plot = Shrub_Species_rand, width = 10, height = 7.07) 
 
 
 ## Step 7) Plot predictions ####
@@ -465,56 +456,11 @@ Shrub_SLA_plot <- ggplot() +
 
 
 ## Step 8) Plot ####
-#Add dots in species into plots
-shrub_species <- Shrubs %>% 
-  select(Species, SLA, Seed_mass, LDMC, Height, SR)
-#Get average values for all traits for each species
-shrub_species <- shrub_species %>%
-  group_by(Species) %>%
-  summarise(SLA = mean(SLA), Seed_mass = mean(Seed_mass), LDMC = mean(LDMC), Height = mean(Height)) 
-#Select for only Pimelea.alpine, Postanthera.cuneata, Acrothamnus.montanus, 
-# Hovea.montana, and Podolobium.alpestre
-shrub_species <- shrub_species %>%
-  filter(Species %in% c("Olearia.phlogopappa.subsp..flavescens", 
-                        "Grevillea.australis", 
-                        "Euryomyrtus.ramosissima.subsp..ramosissima", 
-                        "Acrothamnus.montanus", 
-                        "Hovea.montana", 
-                        "Podolobium.alpestre"))
-unique(shrub_species$Species)
-
-#Add in species
-#SLA
-Shrub_SLA_plot <- Shrub_SLA_plot +
-  geom_point(data = shrub_species, aes(x = SLA, y = 0.25), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = shrub_species, aes(x = SLA, y = 0.25, label = Species), 
-                           direction = "y", force = 5, size = 3,max.overlaps = 100)
-#LDMC
-Shrub_LDMC_plot <- Shrub_LDMC_plot +
-  geom_point(data = shrub_species, aes(x = LDMC, y = 0.25), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = shrub_species, aes(x = LDMC, y = 0.25, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 100)
-#Height
-Shrub_height_plot <- Shrub_height_plot +
-  geom_point(data = shrub_species, aes(x = Height, y = 0.25), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = shrub_species, aes(x = Height, y = 0.25, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 100)
-#Seed mass
-Shrub_seed_plot <- Shrub_seed_plot +
-  geom_point(data = shrub_species, aes(x = Seed_mass, y = 0.25), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = shrub_species, aes(x = Seed_mass, y = 0.25, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 100)
-
 #Add labels
 TrShrub_fixed <- TrShrub_fixed+
   annotate("text", x = Inf, y = Inf, label = "(a)", vjust = 1, hjust = 1, size = 6)
 Shrub_rand <- Shrub_rand+
   annotate("text", x = Inf, y = Inf, label = "(b)", vjust = 1, hjust = 1, size = 6)
-
 Shrub_LDMC_plot <- Shrub_LDMC_plot+
   annotate("text", x = Inf, y = Inf, label = "(c)", vjust = 1, hjust = 1, size = 6)
 Shrub_SLA_plot <- Shrub_SLA_plot+
@@ -534,10 +480,10 @@ Shrub_trait_plot <- grid.arrange(TrShrub_fixed,
                                  #layout_matrix = layout_matrix,
                                  ncol = 2)
 
-ggsave("output/Traits/Bayesian/Shrubs/Shrub traits.png", plot = Shrub_trait_plot, width = 11, height = 12) 
+ggsave("figures/manuscript/Shrub traits.png", plot = Shrub_trait_plot, width = 11, height = 12) 
 
 
-########### GRAMINOID SPECIES ###################
+############## GRAMINOID SPECIES #################
 
 
 glimpse(Graminoid)
@@ -622,9 +568,6 @@ Gram_rand <- ggplot(Gram_ran_DF, aes(x = estimate, y = variable)) +
         axis.title.x = element_text(size = 12)) +
   xlab("Estimated standard deviation")
 
-ggsave("output/Traits/Bayesian/Graminoids/Graminoid traits (random effect).png", 
-       plot = Gram_rand, width = 10, height = 7.07) 
-
 
 # 2. Site
 TrGram_randSite <- as.data.frame(ranef(mTraitsGraminoid, groups = "Site"))
@@ -642,9 +585,6 @@ Gram_Site_rand <- ggplot(TrGram_randSite2, aes(x = Site.Estimate.Intercept, y = 
         axis.title.x = element_text(size = 12)) +
   xlab("Logit coefficients")
 
-ggsave("output/Traits/Bayesian/Graminoids/Graminoid traits (Site random).png", 
-       plot = Gram_Site_rand, width = 10, height = 7.07) 
-
 # 3. Species
 TrGram_randSpp <- as.data.frame(ranef(mTraitsGraminoid, groups = "Species"))
 TrGram_randSpp2 <- rownames_to_column(TrGram_randSpp, var = "Variable")
@@ -660,9 +600,6 @@ Gram_Species_rand <- ggplot(TrGram_randSpp2, aes(x = Species.Estimate.Intercept,
   theme(axis.title.y = element_blank(), 
         axis.title.x = element_text(size = 12)) +
   xlab("Coefficients")
-
-ggsave("output/Traits/Bayesian/Graminoids/Graminoids traits (Species random).png", 
-       plot = Gram_Species_rand, width = 10, height = 7.07) 
 
 
 ## Step 7) Plot predictions #######
@@ -927,57 +864,11 @@ Gram_height_plot <- ggplot(newdat_gram_height_high, aes(x = Height, y = mean)) +
 
 
 ## Step 8) Plot ####
-### Step 8.2) Plot - add in species to plots
-#Add dots in species into plots
-gram_species <- Graminoid %>% 
-  select(Species, SLA, Seed_mass, LDMC, Height, SR)
-#Get average values for all traits for each species
-gram_species <- gram_species %>%
-  group_by(Species) %>%
-  summarise(SLA = mean(SLA), Seed_mass = mean(Seed_mass), LDMC = mean(LDMC), Height = mean(Height)) 
-#Select for only Pimelea.alpine, Postanthera.cuneata, Acrothamnus.montanus, 
-# Hovea.montana, and Podolobium.alpestre
-gram_species <- gram_species %>%
-  filter(Species %in% c("Luzula.novae.cambriae", 
-                         "Poa.fawcettiae", 
-                         "Carex.breviculmis", 
-                         "Anthosachne.scabra", 
-                         "Rytidosperma.nudiflorum", 
-                         "Rytidosperma.pallidum"))
-unique(gram_species$Species)
-
-#Add in species
-#SLA
-Gram_SLA_plot <- Gram_SLA_plot +
-  geom_point(data = gram_species, aes(x = SLA, y = 0.10), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = gram_species, aes(x = SLA, y = 0.10, label = Species), 
-                           direction = "y", force = 5, size = 3,max.overlaps = 10)
-#LDMC
-Gram_LDMC_plot <- Gram_LDMC_plot +
-  geom_point(data = gram_species, aes(x = LDMC, y = 0.10), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = gram_species, aes(x = LDMC, y = 0.10, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 10)
-#Height
-Gram_height_plot <- Gram_height_plot +
-  geom_point(data = gram_species, aes(x = Height, y = 0.10), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = gram_species, aes(x = Height, y = 0.10, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 10)
-#Seed mass
-Gram_SM_plot <- Gram_SM_plot +
-  geom_point(data = gram_species, aes(x = Seed_mass, y = 0.25), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = gram_species, aes(x = Seed_mass, y = 0.25, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 10)
-
 #Add labels
 TrGram_fixed <- TrGram_fixed+
   annotate("text", x = Inf, y = Inf, label = "(a)", vjust = 1, hjust = 1, size = 6)
 Gram_rand <- Gram_rand+
   annotate("text", x = Inf, y = Inf, label = "(b)", vjust = 1, hjust = 1, size = 6)
-
 Gram_LDMC_plot <- Gram_LDMC_plot+
   annotate("text", x = Inf, y = Inf, label = "(c)", vjust = 1, hjust = 1, size = 6)
 Gram_SLA_plot <- Gram_SLA_plot+
@@ -996,13 +887,12 @@ Gram_trait_plot <- grid.arrange(TrGram_fixed,
                                 Gram_SM_plot, 
                                 ncol = 2)
 
-ggsave("output/Traits/Bayesian/Graminoids/Graminoid traits.png", plot = Gram_trait_plot, width = 11, height = 12) 
+ggsave("figures/manuscript/Graminoid traits.png", plot = Gram_trait_plot, width = 11, height = 12) 
 
 
 
 
 ############## FORB SPECIES #################
-
 
 glimpse(Forbs)
 hist(Forbs$SR)
@@ -1096,9 +986,6 @@ Forbs_rand <- ggplot(Forbs_ran_DF, aes(x = estimate, y = variable)) +
         axis.title.x = element_text(size = 12)) +
   xlab("Estimated standard deviation")
 
-ggsave("output/Traits/Bayesian/Forbs/Forbs traits (random effect).png", 
-       plot = Gram_rand, width = 10, height = 7.07) 
-
 # 2. Site effect
 TrForb_randSite <- as.data.frame(ranef(mTraitsForbs, groups = "Site"))
 TrForb_randSite2 <- rownames_to_column(TrForb_randSite, var = "Variable")
@@ -1114,9 +1001,6 @@ Forb_Site_rand <- ggplot(TrForb_randSite2, aes(x = Site.Estimate.Intercept, y = 
   theme(axis.title.y = element_blank(), 
         axis.title.x = element_text(size = 12)) +
   xlab("Logit coefficients")
-
-ggsave("output/Traits/Bayesian/Forbs/Forbs traits (Site random).png", 
-       plot = Forb_Site_rand, width = 10, height = 7.07) 
 
 
 # 3. Species effect
@@ -1134,11 +1018,6 @@ Forb_Species_rand <- ggplot(TrForb_randSpp2, aes(x = Species.Estimate.Intercept,
   theme(axis.title.y = element_blank(), 
         axis.title.x = element_text(size = 12)) +
   xlab("Coefficients")
-
-
-ggsave("output/Traits/Bayesian/Forbs/Forbs traits (Species random).png", 
-       plot = Forb_Species_rand, width = 10, height = 7.07) 
-
 
 
 ## Step 6) Plot predictions ##########
@@ -1410,57 +1289,11 @@ Forb_SM_plot <- ggplot(newdat_Forbs_Seed_mass_high, aes(x = Seed_mass, y = mean)
 
 
 ## Step 8) Plot ####
-### Step 8.2) Plot - add in species to plots
-#Add dots in species into plots
-forb_species <- Forbs %>% 
-  select(Species, SLA, Seed_mass, LDMC, Height, SR)
-#Get average values for all traits for each species
-forb_species <- forb_species %>%
-  group_by(Species) %>%
-  summarise(SLA = mean(SLA), Seed_mass = mean(Seed_mass), LDMC = mean(LDMC), Height = mean(Height)) 
-#Select for only Pimelea.alpine, Postanthera.cuneata, Acrothamnus.montanus, 
-# Hovea.montana, and Podolobium.alpestre
-forb_species <- forb_species %>%
-  filter(Species %in% c("Hypochaeris.radicata", 
-                        "Celmisia.costiniana", 
-                        "Craspedia.aurantia", 
-                        "Ewartia.nubigena", 
-                        "Stelleria.pungens", 
-                        "Leptorhynchos.squamatus.subsp..alpinus"))
-unique(forb_species$Species)
-
-#Add in species
-#SLA
-Forb_SLA_plot <- Forb_SLA_plot +
-  geom_point(data = forb_species, aes(x = SLA, y = 0.10), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = forb_species, aes(x = SLA, y = 0.10, label = Species), 
-                           direction = "y", force = 5, size = 3,max.overlaps = 10)
-#LDMC
-Forb_LDMC_plot <- Forb_LDMC_plot +
-  geom_point(data = forb_species, aes(x = LDMC, y = 0.10), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = forb_species, aes(x = LDMC, y = 0.10, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 10)
-#Height
-Forb_height_plot <- Forb_height_plot +
-  geom_point(data = forb_species, aes(x = Height, y = 0.10), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = forb_species, aes(x = Height, y = 0.10, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 10)
-#Seed mass
-Forb_SM_plot <- Forb_SM_plot +
-  geom_point(data = forb_species, aes(x = Seed_mass, y = 0.10), 
-             size = 3, shape = 21, fill = "black") +
-  ggrepel::geom_text_repel(data = forb_species, aes(x = Seed_mass, y = 0.10, label = Species), 
-                           direction = "y", force = 5, size = 3, max.overlaps = 10)
-
 #Add labels
 Forb_fixed <- Forb_fixed+
   annotate("text", x = Inf, y = Inf, label = "(a)", vjust = 1, hjust = 1, size = 6)
 Forbs_rand <- Forbs_rand+
   annotate("text", x = Inf, y = Inf, label = "(b)", vjust = 1, hjust = 1, size = 6)
-
 Forb_LDMC_plot <- Forb_LDMC_plot+
   annotate("text", x = Inf, y = Inf, label = "(c)", vjust = 1, hjust = 1, size = 6)
 Forb_SLA_plot <- Forb_SLA_plot+
@@ -1481,7 +1314,7 @@ plot_forb <- grid.arrange(Forb_fixed,
                           Forb_SM_plot,
                           ncol = 2)
 
-ggsave("output/Traits/Bayesian/Forbs/Forbs traits.png", 
+ggsave("figures/manuscript/Forbs traits.png", 
        plot = plot_forb,  width = 11, height = 12)
 
 
@@ -1490,7 +1323,7 @@ ggsave("output/Traits/Bayesian/Forbs/Forbs traits.png",
 ## APPENDIX ########################################################################
 ##### Plot predictions vs observed for appendix 
 #Shrubs
-pdf("output/Appendix/Shrub traits model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/Shrub traits model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mTraitsShrubs))
 plot(preds$Estimate ~ mTraitsShrubs$data$qCover,
      xlab = "Shrub observations",
@@ -1498,7 +1331,7 @@ plot(preds$Estimate ~ mTraitsShrubs$data$qCover,
 abline(0, 1, col= 'red')
 
 #Graminoids
-pdf("output/Appendix/Graminoid traits model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/Graminoid traits model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mTraitsGraminoid))
 plot(preds$Estimate ~ mTraitsGraminoid$data$qCover,
      xlab = "Graminoid observations",
@@ -1506,7 +1339,7 @@ plot(preds$Estimate ~ mTraitsGraminoid$data$qCover,
 abline(0, 1, col= 'red')
 
 #Forbs
-pdf("output/Appendix/Forb traits model predictions.pdf", width = 5, height = 3.5)
+pdf("figures/supplementary/Forb traits model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(mTraitsForbs))
 plot(preds$Estimate ~ mTraitsForbs$data$qCover,
      xlab = "Forb observations",
