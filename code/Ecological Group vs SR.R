@@ -820,7 +820,7 @@ dev.off()
 #PA
 pdf("figures/supplementary/EG PA model predictions.pdf", width = 5, height = 3.5)
 preds <- as.data.frame(fitted(EG_model))
-plot(preds$Estimate ~ EG_model$data$qCover,  
+plot(preds$Estimate ~ EG_model$data$PA,  
      xlab = "PA observations",
      ylab = "Model predictions")
 abline(0, 1, col= 'red')
