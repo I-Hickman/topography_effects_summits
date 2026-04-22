@@ -6,7 +6,6 @@ library(datawizard)
 library(MASS)
 library(report) 
 library(ggeffects)
-library(cowplot)
 library(sjPlot)
 library(ggeffects)
 library(glmmTMB)
@@ -20,7 +19,7 @@ library(ggplot2)
 library(brms)
 library(dplyr)
 library(tibble)
-
+library(cowplot)
 
 ###
 ##
@@ -39,10 +38,10 @@ library(tibble)
 ### 1) LOAD DATA AND SCALE VARIABLES #####
 
 div_df <- read.csv("data/Diversity dataset.csv")
-solar_rad <- read.csv("data/Cumulative SR for site per aspect (floristics).csv")
+solar_rad <- read.csv("data/Cumulative SR for site per aspect2.csv")
 div_df <- div_df %>%
   left_join(solar_rad, by = c("Site", "Aspect")) %>% #join solar radiation data
-  dplyr::select(Code, Site, avg.SR, species_richness, hill_1, hill_2) #select relevant columns
+  dplyr::select(Code, Site, avg.SR = cumulative_SR, species_richness, hill_1, hill_2) #select relevant columns
 
 glimpse(div_df) 
 
@@ -89,7 +88,7 @@ custom_labels <- c("SR.std" = "SR",
 
 Rich_fixed_plot <- ggplot(mRich_fixed2, aes(x = Estimate, y = Variable)) +
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0)) +  # Confidence intervals
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -119,13 +118,13 @@ Rich_rand <- ggplot(mRich_rand2, aes(x = Site.Estimate.Intercept, y = reorder(Va
 
 
 #### Step 4) Plot predictions
-mean(div_df$avg.SR) #462020.3
-sd(div_df$avg.SR) #20615.8
-range(div_df$avg.SR) #393523.9 486082.5
+mean(div_df$avg.SR) #749176.8
+sd(div_df$avg.SR) #28909.21
+range(div_df$avg.SR) #652904.8 783700.0
 
 new_rich <- data.frame(Site = "average site", 
-                       avg.SR = seq(393520, 486080, by = 1000)) %>% 
-  dplyr::mutate(SR.std = (avg.SR - 462020.3)/20615.8)
+                       avg.SR = seq(652800, 783800, by = 1000)) %>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28909.21)
 #Predictions
 predictions<- posterior_epred(mD0, newdata = new_rich,  
                               allow_new_levels = TRUE) 
@@ -204,7 +203,7 @@ custom_labels <- c("SR.std" = "SR",
 
 D1_fixed_plot <- ggplot(D1_fixed2, aes(x = Estimate, y = Variable)) +
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0)) +  # Confidence intervals
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -235,8 +234,9 @@ D1_rand <- ggplot(D1_rand2, aes(x = Site.Estimate.Intercept, y = reorder(Variabl
 #### Step 3) Plot predictions from model
 #new dataframe
 new_hill_1 <- data.frame(Site = "average site",
-                        avg.SR = seq(393520, 486080, by = 1000)) %>% 
-  dplyr::mutate(SR.std = (avg.SR - 462020.3)/20615.8)
+                        avg.SR = seq(652800, 783800, by = 1000)) %>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28909.21)
+
 #Predictions
 predictions<- posterior_epred(mD1, newdata = new_hill_1,  
                               allow_new_levels = TRUE) 
@@ -303,8 +303,8 @@ custom_labels <- c("SR.std" = "SR",
                    "Intercept" = "Intercept")
 
 D2_fixed <- ggplot(mD2_fixed2, aes(x = Estimate, y = Variable)) +
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0)) +  # Confidence intervals
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -339,8 +339,10 @@ sd(div_df$avg.SR) #20615.8
 range(div_df$avg.SR) #393523.9 486082.5
 #new dataframe
 new_D2 <- data.frame(Site = "average site", 
-                     avg.SR = seq(393520, 486080, by = 1000)) %>% 
-  dplyr::mutate(SR.std = (avg.SR - 462020.3)/20615.8)
+                     avg.SR = seq(652800, 783800, by = 1000))%>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28909.21)
+
+
 #Predictions
 predictions<- posterior_epred(mD2, newdata = new_D2,  
                               allow_new_levels = TRUE) 
@@ -381,7 +383,7 @@ plot_D2 <- grid.arrange(D2_fixed, D2_plot, ncol = 2)
 plot_all <- grid.arrange(plot_D0, plot_D1, plot_D2, nrow = 3, ncol = 1)
 
 ggsave("figures/supplementary/Diversity indices vs solar radiation.png", 
-       plot = plot_all, width = 11, height = 12)
+       plot = plot_all, width = 11, height = 12, bg = "white")
 
 
 ##### APPENDIX: Plot predictions vs observed for appendix #####

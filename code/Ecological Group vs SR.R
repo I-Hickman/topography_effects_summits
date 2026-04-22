@@ -6,28 +6,31 @@
 library(ggplot2)
 library(cowplot)
 library(brms)
-library(dplyr)
 library(gridExtra)
 library(tibble)
 library(tidyverse)
 library(bayestestR)
 library(GGally)
 library(future)
+library(dplyr)
 
 
 ## Step 1) Load data ######
 
 Florisitc <- read.csv("data/2022 Summit floristic.csv")
 Traits <- read.csv("data/Trait dataset.csv")
-SR <- read.csv("data/Cumulative SR for site per aspect (floristics).csv")
+SR <- read.csv("data/Cumulative SR for site per aspect2.csv")
+
+#Change any species that is classified as Native and change it to Generalist
+Traits$Origin[Traits$Origin == "Generalist"] <- "Native"
 
 #Join SR to florisitics
 Flor_SR <- left_join(Florisitc, SR, by = c("Site", "Aspect"))
 
 #Make Florisitc long form
 Florisitc_LO <- Flor_SR %>% 
-  group_by(Year, Site, avg.SR, Quadrat) %>% 
-  gather(key = "Species", value = "Cover", 14:122) 
+  group_by(Year, Site, avg.SR = cumulative_SR, Quadrat) %>% 
+  gather(key = "Species", value = "Cover", 13:122) 
 
 #Join data sets
 Flor_traits <- left_join(Florisitc_LO, Traits, by = "Species")
@@ -37,9 +40,6 @@ Flor_traits <- Flor_traits %>% filter(!is.na(Origin))
 
 #Check for any NA's in the origin column
 anyNA(Flor_traits$Origin)
-
-#Remove SR.w.m2 column
-Flor_traits <- Flor_traits %>% select(-SR.w.m2)
 
 #Examine data for any issues
 head(Flor_traits)
@@ -147,7 +147,7 @@ ci_eti_fixed_95$Variable <- mRich_fixed2$Variable
 End_fixed2 <- ggplot(ci_eti_fixed_95, aes(x = Estimate, y = Variable)) +
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
   #geom_errorbarh(aes(xmin = Q5.5, xmax = Q94.5, height = 0), linewidth = 0.7) +  # 89% Confidence intervals)
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0), linewidth = 0.3) +  # 95% Confidence intervals
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -165,7 +165,7 @@ mRich_rand2 <- mRich_rand2[order(mRich_rand2$Site.Estimate.Intercept), ]
 
 End_rand <- ggplot(mRich_rand2, aes(x = Site.Estimate.Intercept, y = reorder(Variable, Site.Estimate.Intercept))) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Site.Q2.5.Intercept, xmax = Site.Q97.5.Intercept, height = 0)) +  
+  geom_segment(aes(x = Site.Q2.5.Intercept, xend = Site.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -184,8 +184,8 @@ range(Flor_richness$avg.SR) #393523.9 486082.5
 #ENDEMIC SPECIES
 new_end1 <- data.frame(Site = "average site", 
                       Origin = "Endemic",
-                      SR.w.m2 = seq(393520, 486090, by = 10)) %>% 
-  dplyr::mutate(SR.std = (SR.w.m2 - 461761.6)/20812.24)
+                      avg.SR = seq(652800, 783800, by = 1000)) %>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28909.21)
 #Predictions
 predictions<- posterior_epred(mRich, newdata = new_end1,  
                               allow_new_levels = TRUE) 
@@ -202,8 +202,8 @@ new_end1$uci <- uci
 #GENERALIST SPECIES
 new_gen1 <- data.frame(Site = "average site", 
                       Origin = "Native",
-                      SR.w.m2 = seq(393520, 486090, by = 10)) %>% 
-  dplyr::mutate(SR.std = (SR.w.m2 - 461761.6)/20812.24)
+                      avg.SR = seq(652800, 783800, by = 1000)) %>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28909.21)
 #Predictions
 predictions<- posterior_epred(mRich, newdata = new_gen1,  
                               allow_new_levels = TRUE) 
@@ -221,8 +221,8 @@ new_gen1$uci <- uci
 #EXOTIC SPECIES
 new_exotic1 <- data.frame(Site = "average site", 
                       Origin = "Exotic",
-                      SR.w.m2 = seq(393520, 486090, by = 10)) %>% 
-  dplyr::mutate(SR.std = (SR.w.m2 - 461761.6)/20812.24)
+                      avg.SR = seq(652800, 783800, by = 1000)) %>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28909.21)
 #Predictions
 predictions<- posterior_epred(mRich, newdata = new_exotic1,  
                               allow_new_levels = TRUE) 
@@ -240,14 +240,14 @@ new_exotic1$uci <- uci
 ### Plot
 EGE_plot <- ggplot() + 
   # Endemic species
-  geom_path(data = new_end1, aes(x = SR.w.m2, y = mean, color = "Endemic")) +
-  geom_ribbon(data = new_end1, aes(x = SR.w.m2, ymin = lci, ymax = uci), alpha = 0.2, fill = "darkgreen") +
+  geom_path(data = new_end1, aes(x = avg.SR, y = mean, color = "Endemic")) +
+  geom_ribbon(data = new_end1, aes(x = avg.SR, ymin = lci, ymax = uci), alpha = 0.2, fill = "darkgreen") +
   # Generalist species
-  geom_path(data = new_gen1, aes(x = SR.w.m2, y = mean, color = "Native")) +
-  geom_ribbon(data = new_gen1, aes(x = SR.w.m2, ymin = lci, ymax = uci), alpha = 0.2, fill = "darkblue") +
+  geom_path(data = new_gen1, aes(x = avg.SR, y = mean, color = "Native")) +
+  geom_ribbon(data = new_gen1, aes(x = avg.SR, ymin = lci, ymax = uci), alpha = 0.2, fill = "darkblue") +
   # Exotic species
-  geom_path(data = new_exotic1, aes(x = SR.w.m2, y = mean, color = "Exotic")) +
-  geom_ribbon(data = new_exotic1, aes(x = SR.w.m2, ymin = lci, ymax = uci), alpha = 0.2, fill = "darkorange") +
+  geom_path(data = new_exotic1, aes(x = avg.SR, y = mean, color = "Exotic")) +
+  geom_ribbon(data = new_exotic1, aes(x = avg.SR, ymin = lci, ymax = uci), alpha = 0.2, fill = "darkorange") +
   theme_cowplot() +
   ylab(expression("Species richness")) +
   xlab(expression("Solar radiation W/m" ^ "2")) +
@@ -269,7 +269,7 @@ EGE_plot <- EGE_plot+
 plot_end <- grid.arrange(End_fixed2, EGE_plot, ncol = 2)
 
 ggsave("figures/manuscript/EGE richness vs solar radiation.png", 
-       plot = plot_end, width = 10, height = 3.5)
+       plot = plot_end, width = 10, height = 3.5, bg = "white")
 
 
 
@@ -281,7 +281,7 @@ hist(Flor_traits$Cover)
 
 ## Step 1: Convert cover data to Presence and absence data #####
 EG_PA_data <- Flor_traits %>% 
-  dplyr::select(Code, Site, SR = avg.SR, ele, Aspect, Quadrat,
+  dplyr::select(Code, Site, avg.SR, ele, Aspect, Quadrat,
                 Species, Cover, Origin) %>%
   dplyr::mutate(PA = ifelse(Cover > 0, 1, 0))
   
@@ -290,7 +290,7 @@ hist(EG_PA_data$PA)
 unique(EG_PA_data$PA)
 
 ### Scale predictors
-EG_PA_data$SR.std = as.vector(scale(EG_PA_data$SR)) 
+EG_PA_data$SR.std = as.vector(scale(EG_PA_data$avg.SR)) 
 
 ## Step 2) Models ######
 #Run code below if models are running slow and unhash "future = true" in model
@@ -347,7 +347,7 @@ ci_eti_fixed_95$Variable <- mEG_cov_fixed$Variable
 End_fixed <- ggplot(ci_eti_fixed_95, aes(x = Estimate, y = Variable)) +
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
   #geom_errorbarh(aes(xmin = Q5.5, xmax = Q94.5, height = 0), linewidth = 0.7) +  # 89% Confidence intervals)
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0), linewidth = 0.3) +  # 95% Confidence intervals
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -364,14 +364,14 @@ End_fixed <- ggplot(ci_eti_fixed_95, aes(x = Estimate, y = Variable)) +
 summary(EG_model)
 ran_DF <- data.frame(
   variable = c("Site", "Species"),
-  estimate = c(0.37, 1.72),
-  lci = c(0.25 ,0.58),
-  uci = c(1.47, 2.00)
+  estimate = c(0.38, 1.72),
+  lci = c(0.25 ,1.46),
+  uci = c(0.58, 2.03)
 )
 
 End_random_eff <- ggplot(ran_DF, aes(x = estimate, y = variable)) +
-  geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = lci, xmax = uci, height = 0)) +  
+  geom_point(shape = 16, size = 2.5) +  
+  geom_segment(aes(x = lci, xend = uci)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -389,7 +389,7 @@ mEG_rand <- mEG_rand[order(mEG_rand$Site.Estimate.Intercept), ]
 
 EG_rand_St <- ggplot(mEG_rand, aes(x = Site.Estimate.Intercept, y = reorder(Variable, Site.Estimate.Intercept))) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Site.Q2.5.Intercept, xmax = Site.Q97.5.Intercept, height = 0)) +  
+  geom_segment(aes(x = Site.Q2.5.Intercept, xend = Site.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -404,8 +404,8 @@ mEG_rand <- rownames_to_column(mEG_rand, var = "Variable")
 mEG_rand <- mEG_rand[order(mEG_rand$Species.Estimate.Intercept), ]
 
 EG_rand_Sp <- ggplot(mEG_rand, aes(x = Species.Estimate.Intercept, y = reorder(Variable, Species.Estimate.Intercept))) +
-  geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Species.Q2.5.Intercept, xmax = Species.Q97.5.Intercept, height = 0)) +  
+  geom_point(shape = 16, size = 2.5) +   
+  geom_segment(aes(x = Species.Q2.5.Intercept, xend = Species.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -417,16 +417,16 @@ EG_rand_Sp <- ggplot(mEG_rand, aes(x = Species.Estimate.Intercept, y = reorder(V
 
 ## Step 6) Plot predictions #########
 
-mean(EG_PA_data$SR) #462020.3
-sd(EG_PA_data$SR) #20579.3
-range(EG_PA_data$SR) #393523.9 486082.5
+mean(EG_PA_data$avg.SR) #749176.8
+sd(EG_PA_data$avg.SR) #28858.02
+range(EG_PA_data$avg.SR) #652904.8 783700.0
 
 #ENDEMIC SPECIES
 new_end <- data.frame(Site = "average site", 
                       Species = "average species", 
                       Origin = "Endemic",
-                      SR = seq(393520, 486083, by = 100)) %>% 
-  dplyr::mutate(SR.std = (SR - 462020.3)/20579.3)
+                      avg.SR = seq(652800, 783800, by = 1000)) %>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28858.02)
 #Predictions
 predictions<- posterior_epred(EG_model, newdata = new_end,  
                                      allow_new_levels = TRUE)
@@ -444,8 +444,8 @@ new_end$uci <- uci
 new_gen <- data.frame(Site = "average site", 
                       Species = "average species", 
                       Origin = "Native",
-                      SR = seq(393520, 486083, by = 100)) %>% 
-  dplyr::mutate(SR.std = (SR - 462020.3)/20579.3)
+                      avg.SR = seq(652800, 783800, by = 1000)) %>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28858.02)
 #Predictions
 predictions<- posterior_epred(EG_model, newdata = new_gen,  
                                      allow_new_levels = TRUE)
@@ -464,8 +464,8 @@ new_gen$uci <- uci
 new_exotic <- data.frame(Site = "average site", 
                          Species = "average species", 
                          Origin = "Exotic",
-                         SR = seq(393520, 486083, by = 100)) %>% 
-  dplyr::mutate(SR.std = (SR - 462020.3)/20579.3)
+                         avg.SR = seq(652800, 783800, by = 1000)) %>% 
+  dplyr::mutate(SR.std = (avg.SR - 749176.8)/28858.02)
 #Predictions
 predictions<- posterior_epred(EG_model, newdata = new_exotic,  
                                      allow_new_levels = TRUE)
@@ -481,7 +481,7 @@ new_exotic$uci <- uci
 
 
 ### Plot Endemics
-End_cov_plot <- ggplot(new_end, aes(x = SR, y = mean)) + 
+End_cov_plot <- ggplot(new_end, aes(x = avg.SR, y = mean)) + 
   geom_path(color = "darkgreen") +
   geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2, fill = "darkgreen") +
   ylim(0,1) +
@@ -492,7 +492,7 @@ End_cov_plot <- ggplot(new_end, aes(x = SR, y = mean)) +
         axis.title.x = element_text(size = 12)) 
 
 ### Plot Generalist
-Gen_cov_plot <- ggplot(new_gen, aes(x = SR, y = mean)) + 
+Gen_cov_plot <- ggplot(new_gen, aes(x = avg.SR, y = mean)) + 
   geom_path(color = "darkblue") +
   geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2, fill = "darkblue") +
   ylim(0,1) +
@@ -503,7 +503,7 @@ Gen_cov_plot <- ggplot(new_gen, aes(x = SR, y = mean)) +
         axis.title.x = element_text(size = 12)) 
 
 ### Plot Exotics
-Exot_cov_plot <- ggplot(new_exotic, aes(x = SR, y = mean)) + 
+Exot_cov_plot <- ggplot(new_exotic, aes(x = avg.SR, y = mean)) + 
   geom_path(color = "darkorange") +
   geom_ribbon(aes(ymin = lci, ymax = uci), alpha = 0.2, fill = "darkorange") +
   ylim(0,1) +
@@ -533,7 +533,7 @@ plot_end <- grid.arrange(End_fixed,
                          Exot_cov_plot, ncol = 2)
 
 ggsave("figures/manuscript/EGE PA vs solar radiation.png", 
-       plot = plot_end, width = 11, height = 12)
+       plot = plot_end, width = 11, height = 12, bg = "white")
 
 
 
@@ -552,6 +552,7 @@ EG_cov_data <- Flor_traits %>%
   dplyr::select(Code, Site, SR = avg.SR, ele, Aspect, Quadrat,
                 Species, Cover, Origin) %>%
   dplyr::mutate(pCover = Cover/100) #turn % cover into proportional data
+
 EG_cov_data <- EG_cov_data %>% 
   dplyr::mutate(qCover = qlogis(pCover))
 
@@ -615,7 +616,7 @@ ci_eti_fixed_95$Variable <- mEG_cov_fixed$Variable
 End_fixed <- ggplot(ci_eti_fixed_95, aes(x = Estimate, y = Variable)) +
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
   #geom_errorbarh(aes(xmin = Q5.5, xmax = Q94.5, height = 0), linewidth = 0.7) +  # 89% Confidence intervals)
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0), linewidth = 0.3) +  # 95% Confidence intervals
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -632,14 +633,14 @@ End_fixed <- ggplot(ci_eti_fixed_95, aes(x = Estimate, y = Variable)) +
 summary(EG_cov_model)
 Forbs_ran_DF <- data.frame(
   variable = c("Site", "Species"),
-  estimate = c(0.38, 0.94),
-  lci = c(0.25 ,0.59),
-  uci = c(0.57, 1.11)
+  estimate = c(0.40, 0.95),
+  lci = c(0.26 ,0.81),
+  uci = c(0.62, 1.12)
 )
 
 End_random_eff <- ggplot(Forbs_ran_DF, aes(x = estimate, y = variable)) +
-  geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = lci, xmax = uci, height = 0)) +  
+  geom_point(shape = 16, size = 2.5) +  
+  geom_segment(aes(x = lci, xend = uci)) + 
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -651,13 +652,13 @@ End_random_eff <- ggplot(Forbs_ran_DF, aes(x = estimate, y = variable)) +
 
 ### Site random effects
 #SITE
-mEG_rand <- as.data.frame(ranef(EG_cov_model, groups = "Site"))
-mEG_rand <- rownames_to_column(mEG_rand, var = "Variable")
-mEG_rand <- mEG_rand[order(mEG_rand$Site.Estimate.Intercept), ]
+mEG_rand_site <- as.data.frame(ranef(EG_cov_model, groups = "Site"))
+mEG_rand_site <- rownames_to_column(mEG_rand_site, var = "Variable")
+mEG_rand_site <- mEG_rand_site[order(mEG_rand_site$Site.Estimate.Intercept), ]
 
-EG_rand_St <- ggplot(mEG_rand, aes(x = Site.Estimate.Intercept, y = reorder(Variable, Site.Estimate.Intercept))) +
+EG_rand_St <- ggplot(mEG_rand_site, aes(x = Site.Estimate.Intercept, y = reorder(Variable, Site.Estimate.Intercept))) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Site.Q2.5.Intercept, xmax = Site.Q97.5.Intercept, height = 0)) +  
+  geom_segment(aes(x = Site.Q2.5.Intercept, xend = Site.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -672,8 +673,8 @@ mEG_rand <- rownames_to_column(mEG_rand, var = "Variable")
 mEG_rand <- mEG_rand[order(mEG_rand$Species.Estimate.Intercept), ]
 
 EG_rand_Sp <- ggplot(mEG_rand, aes(x = Species.Estimate.Intercept, y = reorder(Variable, Species.Estimate.Intercept))) +
-  geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Species.Q2.5.Intercept, xmax = Species.Q97.5.Intercept, height = 0)) +  
+  geom_point(shape = 16, size = 2.5) +
+  geom_segment(aes(x = Species.Q2.5.Intercept, xend = Species.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -685,16 +686,16 @@ EG_rand_Sp <- ggplot(mEG_rand, aes(x = Species.Estimate.Intercept, y = reorder(V
 
 ## Step 6) Plot predictions #########
 
-mean(EG_cov_data$SR) #462020.3
-sd(EG_cov_data$SR) #20579.3
-range(EG_cov_data$SR) #393523.9 486082.5
+mean(EG_cov_data$SR) #749202.9
+sd(EG_cov_data$SR) #28554.39
+range(EG_cov_data$SR) #652904.8 783700.0
 
 #ENDEMIC SPECIES
 new_end <- data.frame(Site = "average site", 
                       Species = "average species", 
                       Origin = "Endemic",
-                      SR = seq(393520, 486083, by = 100)) %>% 
-  dplyr::mutate(SR.std = (SR - 462020.3)/20579.3)
+                      SR = seq(652804, 783800, by = 100)) %>% 
+  dplyr::mutate(SR.std = (SR - 749202.9)/28554.39)
 #Predictions
 predictions<- plogis(posterior_epred(EG_cov_model, newdata = new_end,  
                               allow_new_levels = TRUE)) 
@@ -712,8 +713,8 @@ new_end$uci <- uci
 new_gen <- data.frame(Site = "average site", 
                       Species = "average species", 
                       Origin = "Native",
-                      SR = seq(393520, 486083, by = 100)) %>% 
-  dplyr::mutate(SR.std = (SR - 462020.3)/20579.3)
+                      SR = seq(652804, 783800, by = 100)) %>% 
+  dplyr::mutate(SR.std = (SR - 749202.9)/28554.39)
 #Predictions
 predictions<- plogis(posterior_epred(EG_cov_model, newdata = new_gen,  
                               allow_new_levels = TRUE)) 
@@ -732,8 +733,8 @@ new_gen$uci <- uci
 new_exotic <- data.frame(Site = "average site", 
                          Species = "average species", 
                          Origin = "Exotic",
-                         SR = seq(393520, 486083, by = 100)) %>% 
-  dplyr::mutate(SR.std = (SR - 462020.3)/20579.3)
+                         SR = seq(652804, 783800, by = 100)) %>% 
+  dplyr::mutate(SR.std = (SR - 749202.9)/28554.39)
 #Predictions
 predictions<- plogis(posterior_epred(EG_cov_model, newdata = new_exotic,  
                               allow_new_levels = TRUE)) 
@@ -801,7 +802,7 @@ plot_end <- grid.arrange(End_fixed,
                          Exot_cov_plot, ncol = 2)
 
 ggsave("figures/manuscript/EGE cover vs solar radiation.png", 
-       plot = plot_end, width = 11, height = 12)
+       plot = plot_end, width = 11, height = 12, bg = "white")
 
 
 

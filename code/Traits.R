@@ -28,18 +28,22 @@ library(glmmTMB)
 
 ####### 1) Load data and select variables ####
 Trait_data <- read.csv("data/Trait and florisitic data.csv") #this has no 0's in it
+solar_rad <- read.csv("data/Cumulative SR for site per aspect2.csv")
 
 #Omit species with missing trait data
 Trait_data = Trait_data %>% na.omit()
 
+#Join solar radiation data
+Trait_data <- left_join(Trait_data, solar_rad, by = c("Site", "Aspect"))
+
 #Plot the data and check for linear relationship
 plot(qlogis(Trait_data$Cover/100) ~ log(Trait_data$avg.SR))
 hist(Trait_data$Cover)
-hist(Trait_data$avg.SR)
+hist(Trait_data$cumulative_SR)
 
 #Select variables & transform cover data
 Trait_data2 <- Trait_data %>% 
-  dplyr::select(Code, Site, SR =avg.SR, Quadrat,
+  dplyr::select(Code, Site, SR = cumulative_SR, Quadrat,
                 Species, Cover, Origin, Growth_form, 
                 SLA = Mean_SLA_mm2.mg.1, LDMC = Mean_LDMC_mg.g.1, 
                 Seed_mass = Mean_seed_mass_mg, Height = Max_height_m) %>%
@@ -69,7 +73,7 @@ glimpse(Shrubs)
 ## Step 1) Check correlation between variables #####
 #Only put variables in the model that have biological meaning and this goes the same for interactions
 Shrubs %>%
-  dplyr::select(-c(Code, Site, Quadrat, Species, Origin, Growth_form, qCover, pCover, Cover)) %>%
+  dplyr::select(-c(Code, Site, Quadrat, Species, Origin, Growth_form, qCover, pCover, Cover, SR)) %>%
   GGally::ggpairs()
 #Low correlation between traits
 
@@ -125,7 +129,7 @@ custom_labels <- c("LDMC.std" = "LDMC", "SLA.std" = "SLA", "Height.std" = "Heigh
 
 TrShrub_fixed <- ggplot(TrShrub_fixed2, aes(x = Estimate, y = Variable)) +
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0)) +  # Confidence intervals
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -139,14 +143,14 @@ TrShrub_fixed <- ggplot(TrShrub_fixed2, aes(x = Estimate, y = Variable)) +
 summary(mTraitsShrubs)
 shrub_ran_DF <- data.frame(
   variable = c("Site", "Species"),
-  estimate = c(0.34, 0.76),
-  lci = c(0.17, 0.43),
-  uci = c(0.59, 1.22)
+  estimate = c(0.35, 0.80),
+  lci = c(0.17, 0.47),
+  uci = c(0.61, 1.28)
 )
 
 Shrub_rand <- ggplot(shrub_ran_DF, aes(x = estimate, y = variable)) +
-  geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = lci, xmax = uci, height = 0)) +  
+  geom_point(shape = 16, size = 2.5) +
+  geom_segment(aes(x = lci, xend = uci)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -162,8 +166,8 @@ TrShrub_randSite2 <- rownames_to_column(TrShrub_randSite, var = "Variable")
 TrShrub_randSite2 <- TrShrub_randSite2[order(TrShrub_randSite2$Site.Estimate.Intercept), ]
 
 Shrub_Site_rand <- ggplot(TrShrub_randSite2, aes(x = Site.Estimate.Intercept, y = reorder(Variable, Site.Estimate.Intercept))) +
-  geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Site.Q2.5.Intercept, xmax = Site.Q97.5.Intercept, height = 0)) +  
+  geom_point(shape = 16, size = 2.5) + 
+  geom_segment(aes(x = Site.Q2.5.Intercept, xend = Site.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -179,8 +183,8 @@ TrShrub_randSpp2 <- rownames_to_column(TrShrub_randSpp, var = "Variable")
 TrShrub_randSpp2 <- TrShrub_randSpp2[order(TrShrub_randSpp2$Species.Estimate.Intercept), ]
 
 Shrub_Species_rand <- ggplot(TrShrub_randSpp2, aes(x = Species.Estimate.Intercept, y = reorder(Variable, Species.Estimate.Intercept))) +
-  geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Species.Q2.5.Intercept, xmax = Species.Q97.5.Intercept, height = 0)) +  
+  geom_point(shape = 16, size = 2.5) + 
+  geom_segment(aes(x = Species.Q2.5.Intercept, xend = Species.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -192,13 +196,13 @@ Shrub_Species_rand <- ggplot(TrShrub_randSpp2, aes(x = Species.Estimate.Intercep
 
 ## Step 7) Plot predictions ####
 ### LOW & HIGH SR
-mean(Shrubs$SR) #463085.5
-sd(Shrubs$SR) #19306.89
-range(Shrubs$SR) #393523.9 486082.5
-##LOW SR (at 393523.9W/m2 - back calcuated (393523.9 -mean)/SD = -2.285559)
-#(393523.9 - 463085.5)/19306.89 = -3.602942
-#HIGH SR (at 486082.5W/m2 - back calcuated (486082.5 -mean)/SD = -2.285559)
-#(486082.5 - 463085.5)/19306.89 = 1.191129
+mean(Shrubs$SR) #750574.2
+sd(Shrubs$SR) #27455.96
+range(Shrubs$SR) #652904.8 783700.0
+##LOW SR (at 652904.8 W/m2 - back calcuated (393523.9 -mean)/SD = XXX)
+#(652904.8 - 750574.2)/27455.96 = -3.557311
+#HIGH SR (at 783700.0 W/m2 - back calcuated (783700.0 -mean)/SD = XXX)
+#(783700.0 - 750574.2)/27455.96 = 1.206507
 
 
 ##### LDMC #####
@@ -212,8 +216,10 @@ range(Shrubs$LDMC) #296.1039 646.1538
 newdat_shrub_ldmc_low <- data.frame(Site = "average site", #predicting to the average site
                               Species = "average species", #predicting to the average species
                               LDMC = seq(290, 650, by = 5), #range() of LDMC
-                              Seed_mass.std = 0, Height.std = 0, SLA.std = 0, SR.std = -3.602942) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                              Seed_mass.std = 0, Height.std = 0, SLA.std = 0, 
+                              SR.std = -3.557311) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(LDMC.std = (LDMC - 491.035)/79.58581) #back scaling
+
 newdat_shrub_ldmc_low_predictions<- plogis(posterior_epred(mTraitsShrubs, newdata = newdat_shrub_ldmc_low, 
                                                    allow_new_levels = TRUE))
 #Calcuate mean and CI
@@ -232,8 +238,10 @@ newdat_shrub_ldmc_low$uci <- uci
 newdat_shrub_ldmc_high <- data.frame(Site = "average site", #predicting to the average site
                                Species = "average species", #predicting to the average species
                                LDMC = seq(290, 650, by = 5), #range() of LDMC
-                               Seed_mass.std = 0, Height.std = 0, SLA.std = 0, SR.std = 1.191129) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                               Seed_mass.std = 0, Height.std = 0, SLA.std = 0, 
+                               SR.std = 1.206507) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(LDMC.std = (LDMC - 491.035)/79.58581) #back scaling
+
 newdat_shrub_ldmc_high_predictions<- plogis(posterior_epred(mTraitsShrubs, newdata = newdat_shrub_ldmc_high, allow_new_levels = TRUE))
 #Calcuate mean and CI
 mean <- apply(newdat_shrub_ldmc_high_predictions, 2, mean)
@@ -255,7 +263,7 @@ Shrub_LDMC_plot <- ggplot(newdat_shrub_ldmc_high, aes(x = LDMC, y = mean)) +
   geom_ribbon(data = newdat_shrub_ldmc_low, aes(ymin = lci, ymax = uci), alpha = 0.2, fill = "blue") +
   theme_cowplot() +
   ylim(0, 0.9) +
-  ylab(expression("Shrub species proportional cover")) +
+  ylab(expression("Shrub spp cover")) +
   xlab(expression(LDMC ~ (mg/g^-1))) +
   theme(axis.title.y = element_text(size = 12), 
         axis.title.x = element_text(size = 12))
@@ -273,7 +281,8 @@ range(Shrubs$Height) #0.1 2.0
 newdat_shrub_height_low <- data.frame(Site = "average site", #predicting to the average site
                                 Species = "average species", #predicting to the average species
                                 Height = seq(0.1, 2, by = 0.05), #range() of LDMC
-                                LDMC.std = 0, Seed_mass.std = 0, SLA.std = 0, SR.std = -3.602942) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                LDMC.std = 0, Seed_mass.std = 0, SLA.std = 0, 
+                                SR.std = -3.557311) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Height.std = (Height - 0.7723404)/0.4732705) #back scaling
 newdat_height_low_predictions<- plogis(posterior_epred(mTraitsShrubs, newdata = newdat_shrub_height_low, allow_new_levels = TRUE))
 ##Mean & CI
@@ -292,7 +301,8 @@ newdat_shrub_height_low$uci <- uci
 newdat_shrub_height_high <- data.frame(Site = "average site", #predicting to the average site
                                  Species = "average species", #predicting to the average species
                                  Height = seq(0.1, 2, by = 0.05), #range() of LDMC
-                                 LDMC.std = 0, Seed_mass.std = 0, SLA.std = 0, SR.std = 1.191129) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                 LDMC.std = 0, Seed_mass.std = 0, SLA.std = 0, 
+                                 SR.std = 1.206507) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Height.std = (Height - 0.7723404)/0.4732705) #back scaling)
 newdat_height_high_predictions<- plogis(posterior_epred(mTraitsShrubs, newdata = newdat_shrub_height_high, allow_new_levels = TRUE))
 ##Mean & CI
@@ -315,7 +325,7 @@ Shrub_height_plot <- ggplot(newdat_shrub_height_high, aes(x = Height, y = mean))
   geom_ribbon(data = newdat_shrub_height_low, aes(ymin = lci, ymax = uci), alpha = 0.2, fill = "blue") +
   theme_cowplot() +
   ylim(0, 0.9) +
-  ylab(expression("Shrub species proportional cover")) +
+  ylab(expression("Shrub spp cover")) +
   xlab(expression("Height (m)")) +
   theme(axis.title.y = element_text(size = 12), 
         axis.title.x = element_text(size = 12))
@@ -332,7 +342,8 @@ range(Shrubs$Seed_mass) # 0.0196 17.3861
 newdat_shrubs_SM_low <- data.frame(Site = "average site", #predicting to the average site
                             Species = "average species", #predicting to the average species
                             Seed_mass = seq(0.0196, 18, by = 0.5), #range() of LDMC
-                            LDMC.std = 0, Height.std = 0, SLA.std = 0, SR.std = -3.602942) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                            LDMC.std = 0, Height.std = 0, SLA.std = 0, 
+                            SR.std = -3.557311) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Seed_mass.std = (Seed_mass - 8.32813)/6.19139) #back scaling)
 newdat_shrubs_SM_low_predictions<- plogis(posterior_epred(mTraitsShrubs, newdata = newdat_shrubs_SM_low, allow_new_levels = TRUE))
 ##Mean & CI
@@ -351,7 +362,8 @@ newdat_shrubs_SM_low$uci <- uci
 newdat_shrubs_SM_high <- data.frame(Site = "average site", #predicting to the average site
                              Species = "average species", #predicting to the average species
                              Seed_mass = seq(0.0196, 18, by = 0.5), #range() of LDMC
-                             LDMC.std = 0, Height.std = 0, SLA.std = 0, SR.std = 1.191129) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                             LDMC.std = 0, Height.std = 0, SLA.std = 0, 
+                             SR.std = 1.206507) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Seed_mass.std = (Seed_mass - 8.32813)/6.19139) #back scaling)
 #Predictions
 newdat_shrubs_SM_high_predictions<- plogis(posterior_epred(mTraitsShrubs, newdata = newdat_shrubs_SM_high, allow_new_levels = TRUE))
@@ -390,8 +402,10 @@ range(Shrubs$SLA) # 4.179176 12.149123
 newdat_shrubs_SLA_low <- data.frame(Site = "average site", #predicting to the average site
                                    Species = "average species", #predicting to the average species
                                    SLA = seq(4, 13, by = 0.5), #range() 
-                                   LDMC.std = 0, Height.std = 0, Seed_mass.std = 0, SR.std = -3.602942) %>% #predicting when other variables are at 0 which is their mean
+                                   LDMC.std = 0, Height.std = 0, Seed_mass.std = 0, 
+                                   SR.std = -3.557311) %>% #predicting when other variables are at 0 which is their mean
   dplyr::mutate(SLA.std = (SLA - 7.592492)/2.498738) #back scaling
+
 newdat_shrubs_SLA_low_predictions<- plogis(posterior_epred(mTraitsShrubs, newdata = newdat_shrubs_SLA_low, allow_new_levels = TRUE))
 ##Mean & CI
 mean <- apply(newdat_shrubs_SLA_low_predictions, 2, mean)
@@ -409,7 +423,8 @@ newdat_shrubs_SLA_low$uci <- uci
 newdat_shrubs_SLA_high <- data.frame(Site = "average site", #predicting to the average site
                                     Species = "average species", #predicting to the average species
                                     SLA = seq(4, 13, by = 0.5), #range() 
-                                    LDMC.std = 0, Height.std = 0, Seed_mass.std = 0, SR.std = 1.191129) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                    LDMC.std = 0, Height.std = 0, Seed_mass.std = 0, 
+                                    SR.std = 1.206507) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(SLA.std = (SLA - 7.592492)/2.498738) #back scaling)
 #Predictions
 newdat_shrubs_SLA_high_predictions<- plogis(posterior_epred(mTraitsShrubs, newdata = newdat_shrubs_SLA_high, allow_new_levels = TRUE))
@@ -437,22 +452,23 @@ Shrub_SLA_plot <- ggplot(newdat_shrubs_SLA_high, aes(x = SLA, y = mean)) +
   theme(axis.title.y = element_text(size = 12), 
         axis.title.x = element_text(size = 12))
 
-Shrub_SLA_plot <- ggplot() +
+#Adding legend to the plot
+#Shrub_SLA_plot <- ggplot() +
   # High SLA
-  geom_path(data = newdat_shrubs_SLA_high, aes(x = SLA, y = mean, color = "High")) +
-  geom_ribbon(data = newdat_shrubs_SLA_high, aes(x = SLA, ymin = lci, ymax = uci), alpha = 0.2, fill = "red") +
+ # geom_path(data = newdat_shrubs_SLA_high, aes(x = SLA, y = mean, color = "High")) +
+  #geom_ribbon(data = newdat_shrubs_SLA_high, aes(x = SLA, ymin = lci, ymax = uci), alpha = 0.2, fill = "red") +
   # Low SLA
-  geom_path(data = newdat_shrubs_SLA_low, aes(x = SLA, y = mean, color = "Low")) +
-  geom_ribbon(data = newdat_shrubs_SLA_low, aes(x = SLA, ymin = lci, ymax = uci), alpha = 0.2, fill = "blue") +
-  theme_cowplot() +
-  ylim(0, 0.9) +
-  ylab(expression(" ")) +
-  xlab(expression(SLA ~ (mm^2/mg^-1))) +
-  theme(axis.title.y = element_text(size = 12), 
-        axis.title.x = element_text(size = 12)) +
-  scale_color_manual(values = c("High" = "red", "Low" = "blue")) +
-  theme(legend.position = "right") +
-  labs(color = "Solar radiation")
+  #geom_path(data = newdat_shrubs_SLA_low, aes(x = SLA, y = mean, color = "Low")) +
+  #geom_ribbon(data = newdat_shrubs_SLA_low, aes(x = SLA, ymin = lci, ymax = uci), alpha = 0.2, fill = "blue") +
+  #theme_cowplot() +
+  #ylim(0, 0.9) +
+  #ylab(expression(" ")) +
+  #xlab(expression(SLA ~ (mm^2/mg^-1))) +
+  #theme(axis.title.y = element_text(size = 12), 
+   #     axis.title.x = element_text(size = 12)) +
+  #scale_color_manual(values = c("High" = "red", "Low" = "blue")) +
+  #theme(legend.position = "right") +
+  #labs(color = "Solar radiation")
 
 
 ## Step 8) Plot ####
@@ -480,7 +496,7 @@ Shrub_trait_plot <- grid.arrange(TrShrub_fixed,
                                  #layout_matrix = layout_matrix,
                                  ncol = 2)
 
-ggsave("figures/manuscript/Shrub traits.png", plot = Shrub_trait_plot, width = 11, height = 12) 
+ggsave("figures/manuscript/Shrub traits.png", plot = Shrub_trait_plot, width = 11, height = 12, bg = "white") 
 
 
 ############## GRAMINOID SPECIES #################
@@ -537,7 +553,7 @@ TrGram_fixed2$Variable <- factor(TrGram_fixed2$Variable,
 
 TrGram_fixed <- ggplot(TrGram_fixed2, aes(x = Estimate, y = Variable)) +
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0)) +  # Confidence intervals
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -552,14 +568,14 @@ TrGram_fixed <- ggplot(TrGram_fixed2, aes(x = Estimate, y = Variable)) +
 summary(mTraitsGraminoid)
 Gram_ran_DF <- data.frame(
   variable = c("Site", "Species"),
-  estimate = c( 0.41, 0.90),
-  lci = c(0.26 ,0.65),
-  uci = c(0.59, 1.40)
+  estimate = c( 0.41, 0.91),
+  lci = c(0.26 ,0.64),
+  uci = c(0.59, 1.41)
 )
 
 Gram_rand <- ggplot(Gram_ran_DF, aes(x = estimate, y = variable)) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = lci, xmax = uci, height = 0)) +  
+  geom_segment(aes(x = lci, xend = uci)) + 
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -576,7 +592,7 @@ TrShrub_randSite2 <- TrGram_randSite2[order(TrGram_randSite2$Site.Estimate.Inter
 
 Gram_Site_rand <- ggplot(TrGram_randSite2, aes(x = Site.Estimate.Intercept, y = reorder(Variable, Site.Estimate.Intercept))) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Site.Q2.5.Intercept, xmax = Site.Q97.5.Intercept, height = 0)) +  
+  geom_segment(aes(x = Site.Q2.5.Intercept, xend = Site.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -592,7 +608,7 @@ TrGram_randSpp2 <- TrGram_randSpp2[order(TrGram_randSpp2$Species.Estimate.Interc
 
 Gram_Species_rand <- ggplot(TrGram_randSpp2, aes(x = Species.Estimate.Intercept, y = reorder(Variable, Species.Estimate.Intercept))) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Species.Q2.5.Intercept, xmax = Species.Q97.5.Intercept, height = 0)) +  
+  geom_segment(aes(x = Species.Q2.5.Intercept, xend = Species.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -604,13 +620,13 @@ Gram_Species_rand <- ggplot(TrGram_randSpp2, aes(x = Species.Estimate.Intercept,
 
 ## Step 7) Plot predictions #######
 ### LOW & HIGH SR
-mean(Graminoid$SR) #461002.7
-sd(Graminoid$SR) #21394.58
-range(Graminoid$SR) 
-##LOW SR (at 850W/m2 - back calcuated (850 -mean)/SD = -2.285559)
-#(393523.9 - 461002.7)/21394.58 = -3.154014
-#HIGH SR (at 950W/m2 - back calcuated (850 -mean)/SD = -2.285559)
-#(486082.5 - 461002.7)/21394.58 = 1.17225
+mean(Graminoid$SR) #747727.8
+sd(Graminoid$SR) #29622.12
+range(Graminoid$SR)  #652904.8 783700.0
+##LOW SR (at 652904.8 W/m2 - back calcuated (393523.9 -mean)/SD = XXX)
+#(652904.8 - 747727.8)/29622.12 = -3.201088
+#HIGH SR (at 783700.0 W/m2 - back calcuated (783700.0 -mean)/SD = XXX)
+#(783700.0 - 747727.8)/29622.12 = 1.21437
 
 ##### LDMC #####
 mean(Graminoid$LDMC) #422.0755
@@ -623,7 +639,7 @@ newdat_gram_ldmc_low <- data.frame(Site = "average site", #predicting to the ave
                               Species = "average species", #predicting to the average species
                               LDMC = seq(320, 510, by = 10), #range() of LDMC
                               Seed_mass.std = 0, SLA.std = 0, 
-                              Height.std =0, SR.std = -3.154014) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                              Height.std =0, SR.std = -3.201088) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(LDMC.std = (LDMC - 422.0755)/65.2567) #back scaling
 #Predict
 newdat_gram_ldmc_low_predictions<- plogis(posterior_epred(mTraitsGraminoid, newdata = newdat_gram_ldmc_low, 
@@ -644,7 +660,7 @@ newdat_gram_ldmc_high <- data.frame(Site = "average site", #predicting to the av
                                Species = "average species", #predicting to the average species
                                LDMC = seq(320, 510, by = 10), #range() of LDMC
                                Seed_mass.std = 0, SLA.std = 0, 
-                               Height.std =0, SR.std = 1.17225) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                               Height.std =0, SR.std = 1.21437) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(LDMC.std = (LDMC - 422.0755)/65.2567) #back scaling
 #Predict
 newdat_gram_ldmc_high_predictions<- plogis(posterior_epred(mTraitsGraminoid, newdata = newdat_gram_ldmc_high, allow_new_levels = TRUE))
@@ -687,7 +703,7 @@ newdat__gram_Seedmass_low <- data.frame(Site = "average site", #predicting to th
                                    Species = "average species", #predicting to the average species
                                    Seed_mass = seq(0.1, 13, by = 0.25), #range() of LDMC
                                    LDMC.std = 0, SLA.std = 0, 
-                                   Height.std =0, SR.std = -3.154014) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                   Height.std =0, SR.std = -3.201088) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Seed_mass.std = (Seed_mass - 0.8335367)/1.597606) #back scaling
 #Model Predictions
 newdat_gram_SM_low_predictions<- plogis(posterior_epred(mTraitsGraminoid, newdata = newdat__gram_Seedmass_low, allow_new_levels = TRUE))
@@ -707,7 +723,7 @@ newdat_gram_Seedmass_high <- data.frame(Site = "average site", #predicting to th
                                     Species = "average species", #predicting to the average species
                                     Seed_mass = seq(0.1, 13, by = 0.25), #range() of LDMC
                                     LDMC.std = 0, SLA.std = 0, 
-                                    Height.std =0, SR.std = 1.17225) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                    Height.std =0, SR.std = 1.21437) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Seed_mass.std = (Seed_mass - 0.8335367)/1.597606) #back scaling
 #Model predictions
 newdat_gram_SM_high_predictions<- plogis(posterior_epred(mTraitsGraminoid, newdata = newdat_gram_Seedmass_high, allow_new_levels = TRUE))
@@ -749,7 +765,7 @@ newdat_gram_SLA_low <- data.frame(Site = "average site", #predicting to the aver
                                     Species = "average species", #predicting to the average species
                                     SLA = seq(4, 16, by = 0.5), #range() 
                                     LDMC.std = 0, Height.std = 0, 
-                                  Seed_mass.std = 0, SR.std = -3.154014) %>% #predicting when other variables are at 0 which is their mean
+                                  Seed_mass.std = 0, SR.std = -3.201088) %>% #predicting when other variables are at 0 which is their mean
   dplyr::mutate(SLA.std = (SLA - 12.2894)/3.545692) #back scaling
 newdat_gram_SLA_low_predictions<- plogis(posterior_epred(mTraitsGraminoid, newdata = newdat_gram_SLA_low, allow_new_levels = TRUE))
 ##Mean & CI
@@ -769,7 +785,7 @@ newdat_gram_SLA_high <- data.frame(Site = "average site", #predicting to the ave
                                      Species = "average species", #predicting to the average species
                                      SLA = seq(4, 16, by = 0.5), #range() 
                                      LDMC.std = 0, Height.std = 0, 
-                                   Seed_mass.std = 0, SR.std = 1.17225) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                   Seed_mass.std = 0, SR.std = 1.21437) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(SLA.std = (SLA - 12.2894)/3.545692) #back scaling
 #Predictions
 newdat_gram_SLA_high_predictions<- plogis(posterior_epred(mTraitsGraminoid, newdata = newdat_gram_SLA_high, allow_new_levels = TRUE))
@@ -811,7 +827,7 @@ newdat_gram_height_low <- data.frame(Site = "average site", #predicting to the a
                                   Species = "average species", #predicting to the average species
                                   Height = seq(0.05, 2, by = 0.05), #range() 
                                   LDMC.std = 0, SLA.std = 0, 
-                                  Seed_mass.std = 0, SR.std = -3.154014) %>% #predicting when other variables are at 0 which is their mean
+                                  Seed_mass.std = 0, SR.std = -3.201088) %>% #predicting when other variables are at 0 which is their mean
   dplyr::mutate(Height.std = (Height - 0.3929412)/0.2704131) #back scaling
 newdat_gram_Height_low_predictions<- plogis(posterior_epred(mTraitsGraminoid, newdata = newdat_gram_height_low, allow_new_levels = TRUE))
 ##Mean & CI
@@ -831,7 +847,7 @@ newdat_gram_height_high <- data.frame(Site = "average site", #predicting to the 
                                    Species = "average species", #predicting to the average species
                                    Height = seq(0.05, 2, by = 0.05), #range() 
                                    LDMC.std = 0, SLA.std = 0, 
-                                   Seed_mass.std = 0, SR.std = 1.17225) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                   Seed_mass.std = 0, SR.std = 1.21437) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Height.std = (Height - 0.3929412)/0.2704131) #back scaling
 #Predictions
 newdat_gram_height_high_predictions<- plogis(posterior_epred(mTraitsGraminoid, newdata = newdat_gram_height_high, allow_new_levels = TRUE))
@@ -887,7 +903,7 @@ Gram_trait_plot <- grid.arrange(TrGram_fixed,
                                 Gram_SM_plot, 
                                 ncol = 2)
 
-ggsave("figures/manuscript/Graminoid traits.png", plot = Gram_trait_plot, width = 11, height = 12) 
+ggsave("figures/manuscript/Graminoid traits.png", plot = Gram_trait_plot, width = 11, height = 12, bg = "white") 
 
 
 
@@ -954,7 +970,7 @@ custom_labels <- c("LDMC.std" = "LDMC", "SLA.std" = "SLA", "Height.std" = "Heigh
 
 Forb_fixed <- ggplot(mForb_fixed2, aes(x = Estimate, y = Variable)) +
   geom_point(shape = 16, size = 2.5) +         # Point for the estimate
-  geom_errorbarh(aes(xmin = Q2.5, xmax = Q97.5, height = 0)) +  # Confidence intervals
+  geom_segment(aes(x = Q2.5, xend = Q97.5, y = Variable, yend = Variable)) + # Confidence intervals
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    # Add a dashed line at x = 0
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -971,13 +987,13 @@ summary(mTraitsForbs)
 Forbs_ran_DF <- data.frame(
   variable = c("Site", "Species"),
   estimate = c(0.41, 0.80),
-  lci = c(0.27 ,0.64),
-  uci = c(0.61, 1.03)
+  lci = c(0.27 ,0.63),
+  uci = c(0.62, 1.02)
 )
 
 Forbs_rand <- ggplot(Forbs_ran_DF, aes(x = estimate, y = variable)) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = lci, xmax = uci, height = 0)) +  
+  geom_segment(aes(x = lci, xend = uci)) +   
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -993,7 +1009,7 @@ TrForb_randSite2 <- TrForb_randSite2[order(TrForb_randSite2$Site.Estimate.Interc
 
 Forb_Site_rand <- ggplot(TrForb_randSite2, aes(x = Site.Estimate.Intercept, y = reorder(Variable, Site.Estimate.Intercept))) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Site.Q2.5.Intercept, xmax = Site.Q97.5.Intercept, height = 0)) +  
+  geom_segment(aes(x = Site.Q2.5.Intercept, xend = Site.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   #scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -1010,7 +1026,7 @@ TrForb_randSpp2 <- TrForb_randSpp2[order(TrForb_randSpp2$Species.Estimate.Interc
 
 Forb_Species_rand <- ggplot(TrForb_randSpp2, aes(x = Species.Estimate.Intercept, y = reorder(Variable, Species.Estimate.Intercept))) +
   geom_point(shape = 16, size = 2.5) +        
-  geom_errorbarh(aes(xmin = Species.Q2.5.Intercept, xmax = Species.Q97.5.Intercept, height = 0)) +  
+  geom_segment(aes(x = Species.Q2.5.Intercept, xend = Species.Q97.5.Intercept, y = Variable, yend = Variable)) +  # Confidence intervals as single bars
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +    
   #scale_y_discrete(labels = custom_labels) +
   scale_x_continuous() +
@@ -1022,15 +1038,13 @@ Forb_Species_rand <- ggplot(TrForb_randSpp2, aes(x = Species.Estimate.Intercept,
 
 ## Step 6) Plot predictions ##########
 ### LOW & HIGH SR
-mean(Forbs$SR) #462304.7
-sd(Forbs$SR) #20020.31
-range(Forbs$SR) 
-##LOW SR (at 850W/m2 - back calcuated (850 -mean)/SD = -2.285559)
-#(393523.9 - 462304.7)/20020.31 = -3.435551
-#HIGH SR (at 950W/m2 - back calcuated (850 -mean)/SD = -2.285559)
-#(486082.5 - 462304.7)/20020.31 = 1.187684
-
-
+mean(Forbs$SR) #749323.4
+sd(Forbs$SR) #28427.96
+range(Forbs$SR) #652904.8 783700.0
+##LOW SR (at 652904.8 W/m2 - back calcuated (393523.9 -mean)/SD = XXX)
+#(652904.8 - 749323.4)/28427.96 = -3.391682
+#HIGH SR (at 783700.0 W/m2 - back calcuated (783700.0 -mean)/SD = XXX)
+#(783700.0 - 749323.4)/28427.96 = 1.209253
 
 ##### LDMC ######
 mean(Forbs$LDMC) #210.9089
@@ -1043,7 +1057,7 @@ newdat_forbs_ldmc_low <- data.frame(Site = "average site", #predicting to the av
                                    Species = "average species", #predicting to the average species
                                    LDMC = seq(78, 614, by = 5), #range() of LDMC
                                    Seed_mass.std = 0, SLA.std =0, 
-                                   Height.std = 0, SR.std = -3.435551) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                   Height.std = 0, SR.std = -3.391682) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(LDMC.std = (LDMC - 210.9089)/78.91859)#back scaling
 #Predictions
 newdat_forb_ldmc_low_predictions<- plogis(posterior_epred(mTraitsForbs, newdata = newdat_forbs_ldmc_low, 
@@ -1063,7 +1077,8 @@ newdat_forbs_ldmc_low$uci <- uci
 newdat_forbs_ldmc_HIGH <- data.frame(Site = "average site", #predicting to the average site
                                     Species = "average species", #predicting to the average species
                                     LDMC = seq(78, 614, by = 5), #range() of LDMC
-                                    Seed_mass.std = 0, SLA.std = 0, Height.std = 0, SR.std = 1.187684) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                    Seed_mass.std = 0, SLA.std = 0, 
+                                    Height.std = 0, SR.std = 1.209253) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(LDMC.std = (LDMC - 210.9089)/78.91859)#back scaling
 #Predictions
 newdat_forb_ldmc_high_predictions<- plogis(posterior_epred(mTraitsForbs, newdata = newdat_forbs_ldmc_HIGH, 
@@ -1107,7 +1122,7 @@ newdat_forbs_sla_low <- data.frame(Site = "average site", #predicting to the ave
                              Species = "average species", #predicting to the average species
                              SLA = seq(2, 26, by = 0.25), #range() of LDMC
                              Seed_mass.std = 0, LDMC.std = 0, 
-                             Height.std = 0, SR.std = -3.435551) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                             Height.std = 0, SR.std = -3.391682) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(SLA.std = ((SLA - 15.38108)/5.496649)) #back scaling
 #Predictions
 newdat_forb_SLA_low_predictions<- plogis(posterior_epred(mTraitsForbs, newdata = newdat_forbs_sla_low, 
@@ -1128,7 +1143,7 @@ newdat_forbs_sla_HIGH <- data.frame(Site = "average site", #predicting to the av
                                    Species = "average species", #predicting to the average species
                                    SLA = seq(2, 26, by = 0.25), #range() of LDMC
                                    Seed_mass.std = 0, LDMC.std = 0, 
-                                   Height.std = 0, SR.std = 1.187684) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                   Height.std = 0, SR.std = 1.209253) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(SLA.std = ((SLA - 15.38108)/5.496649)) #back scaling
 #Predictions
 newdat_forb_SLA_high_predictions<- plogis(posterior_epred(mTraitsForbs, newdata = newdat_forbs_sla_HIGH, 
@@ -1173,7 +1188,7 @@ newdat_forb_H_height_low <- data.frame(Site = "average site", #predicting to the
                                   Species = "average species", #predicting to the average species
                                   Height = seq(0.015, 1.4, by = 0.5), #range() of LDMC
                                   Seed_mass.std = 0,LDMC.std = 0, 
-                                  SLA.std = 0, SR.std = -3.435551) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                  SLA.std = 0, SR.std = -3.391682) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Height.std = ((Height - 0.4377948)/0.2526176)) #back transforming and unscaling
 #Predict
 newdat_forb_height_low_predictions<- plogis(posterior_epred(mTraitsForbs, newdata = newdat_forb_H_height_low, 
@@ -1194,7 +1209,7 @@ newdat_forb_H_height_high <- data.frame(Site = "average site", #predicting to th
                                    Species = "average species", #predicting to the average species
                                    Height = seq(0.015, 1.4, by = 0.5), #range() of LDMC
                                    Seed_mass.std = 0, LDMC.std = 0, 
-                                   SLA.std = 0, SR.std = 1.187684) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                   SLA.std = 0, SR.std = 1.209253) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Height.std = ((Height - 0.4377948)/0.2526176)) 
 #Predict
 newdat_forb_height_high_predictions<- plogis(posterior_epred(mTraitsForbs, newdata = newdat_forb_H_height_high, allow_new_levels = TRUE))
@@ -1236,7 +1251,7 @@ newdat_forb_Seed_mass_low <- data.frame(Site = "average site", #predicting to th
                                      Species = "average species", #predicting to the average species
                                      Seed_mass = seq(0.006, 6, by = 0.05), #range() of LDMC
                                      Height.std = 0, LDMC.std = 0, 
-                                     SLA.std = 0, SR.std = -3.435551) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                     SLA.std = 0, SR.std = -3.391682) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Seed_mass.std = ((Seed_mass - 1.766151)/1.764351)) #back transforming and unscaling
 #Model predictions
 newdat_forb_SM_low_predictions<- plogis(posterior_epred(mTraitsForbs, newdata = newdat_forb_Seed_mass_low, 
@@ -1258,7 +1273,7 @@ newdat_Forbs_Seed_mass_high <- data.frame(Site = "average site", #predicting to 
                                       Species = "average species", #predicting to the average species
                                       Seed_mass = seq(0.006, 6, by = 0.05), #range() of LDMC
                                       Height.std = 0, LDMC.std = 0, 
-                                      SLA.std = 0, SR.std = 1.187684) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
+                                      SLA.std = 0, SR.std = 1.209253) %>% #predicting LDMC when SLA, height and SR are at 0 which is their mean
   dplyr::mutate(Seed_mass.std = ((Seed_mass - 1.766151)/1.764351)) #back transforming and unscaling
 #Model predictions
 newdat_forb_SM_high_predictions<- plogis(posterior_epred(mTraitsForbs, newdata = newdat_Forbs_Seed_mass_high, allow_new_levels = TRUE))
@@ -1315,7 +1330,7 @@ plot_forb <- grid.arrange(Forb_fixed,
                           ncol = 2)
 
 ggsave("figures/manuscript/Forbs traits.png", 
-       plot = plot_forb,  width = 11, height = 12)
+       plot = plot_forb,  width = 11, height = 12, bg = "white")
 
 
 
