@@ -21,6 +21,10 @@ Florisitc <- read.csv("data/2022 Summit floristic.csv")
 Traits <- read.csv("data/Trait dataset.csv")
 SR <- read.csv("data/Cumulative SR for site per aspect2.csv")
 
+glimpse(Florisitc)
+glimpse(Traits)
+glimpse(SR)
+
 #Change any species that is classified as Native and change it to Generalist
 Traits$Origin[Traits$Origin == "Generalist"] <- "Native"
 
@@ -51,6 +55,7 @@ average_frequency <- Florisitc_LO %>%
   filter(Cover != 0) %>%
   group_by(Year, Species) %>%
   summarise(total_occurrences = n()) 
+  #get 
   
 average_frequency2 <- average_frequency %>% 
   group_by(Year) %>%
@@ -60,6 +65,30 @@ average_frequency2 <- average_frequency %>%
 #Carex brevi = 205
 #number of quadrats = 280
 205/280
+
+##### OCCURANCE OF SPECIES ######
+
+# Option 1: frequency per site (14 sites x 4 quadrants = 56 quadrants, not 280 quadrats)
+n_quadrants <- Florisitc_LO %>%
+  ungroup() %>%
+  distinct(Site, Aspect) %>%
+  nrow()
+
+average_frequency_site <- Florisitc_LO %>%
+  filter(Cover != 0) %>%
+  group_by(Species) %>%
+  summarise(
+    total_occurrences = n_distinct(paste(Site, Aspect)),
+    frequency         = total_occurrences / n_quadrants) %>%
+  summarise(
+    mean_frequency = mean(frequency),
+    se_frequency   = sd(frequency) / sqrt(n()))
+
+average_frequency_site
+
+
+
+###### NUMBER OF EXOTIC, NATIVE AND ENDEMIC SPECIES #######
 
 #Find out the number of endemic, native and exotic species
 count<- Flor_traits %>%
