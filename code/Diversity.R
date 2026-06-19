@@ -60,6 +60,16 @@ ggplot(div_df, aes(x = avg.SR, y = species_richness)) +
        y = "Species richness") +
   theme_minimal()
 
+
+#Average species per quadrat
+avg_species_per_quadrat <- div_df %>%
+  summarise(
+    mean_richness = mean(species_richness),
+    se_richness   = sd(species_richness) / sqrt(n()))
+
+avg_species_per_quadrat
+
+
 #### Step 2) Build ecologiclly sound models that attemt to answer your question
 
 mD0 <- brms::brm(species_richness ~ SR.std + (1 | Site),
